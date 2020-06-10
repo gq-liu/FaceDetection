@@ -109,7 +109,9 @@ def get_target_matrix(img_labels_list, img_size):
         w_r = float(w) / img_size
         h_r = float(h) / img_size
         x_th = int(x_r * 9)
+        if x_th == 9: x_th -= 1
         y_th = int(y_r * 9)
+        if x_th == 9: x_th -= 1
         center_x = (x - (float(img_size) / 9) * x_th) / (float(img_size) / 9)
         center_y = (y - (float(img_size) / 9) * y_th) / (float(img_size) / 9)
         matrix[0][x_th][y_th] = 1
@@ -140,25 +142,25 @@ class ImageFolder(Dataset):
 
 
 class ListDataset(Dataset):
-    def __init__(self, list_path, label_path, img_size=288, augment=True, multiscale=True, normalized_labels=True):
-        self.data_path = "data/WIDER_train/resized_images"
-        if not os.path.exists(self.data_path):
+    def __init__(self, list_path, resized_data_path, label_path, resized_label_path, img_size=288, augment=True, multiscale=True, normalized_labels=True):
+        # self.data_path = "data/WIDER_train/resized_images"
+        if not os.path.exists(resized_data_path):
             self.img_labels_dict = read_annotations(label_path)
-            resize_images(list_path, self.data_path, self.img_labels_dict)
-            write_annotations(self.img_labels_dict, "data/wider_face_split/wider_face_train_bbx_gt_resized.txt")
+            resize_images(list_path, resized_data_path, self.img_labels_dict)
+            write_annotations(self.img_labels_dict, resized_label_path)
 
-        self.img_labels_dict = read_annotations("data/wider_face_split/wider_face_train_bbx_gt_resized.txt")
+        self.img_labels_dict = read_annotations(resized_label_path)
         self.img_files = []
         self.label_files = []
         self.target_matrix = []
-        dirs = os.listdir(self.data_path)
+        dirs = os.listdir(resized_data_path)
         for dir in dirs:
             if dir == ".DS_Store": continue
-            files = os.listdir(self.data_path + "/" + dir)
+            files = os.listdir(resized_data_path + "/" + dir)
             for file in files:
                 filename = dir + "/" + file
-                print(filename)
-                file_path = self.data_path + "/" + filename
+                # print(filename)
+                file_path = resized_data_path + "/" + filename
                 image = cv2.imread(file_path).astype(dtype=np.float)
                 # image_resized = resize(image, img_size)
                 self.img_files.append(image)

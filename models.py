@@ -249,8 +249,9 @@ class Darknet(nn.Module):
         layer_outputs, yolo_outputs = [], []
         for i, (module_def, module) in enumerate(zip(self.module_defs, self.module_list)):
             x = module(x)
-        loss += self.compute_loss(x, targets)
-        return loss, x
+        if targets is not None:
+            loss += self.compute_loss(x, targets)
+        return x if targets is None else (loss, x)
         #     if module_def["type"] in ["convolutional", "upsample", "maxpool"]:
         #         x = module(x)
         #     elif module_def["type"] == "route":
@@ -267,24 +268,53 @@ class Darknet(nn.Module):
         # return yolo_outputs if targets is None else (loss, yolo_outputs)
 
     def compute_loss(self, x, targets):
-        for x_ind in range(x.shape[2]):
-            for y_ind in range(x.shape[3]):
-                if targets[0][0][x_ind][y_ind] == 0.0:
-                    for batch in range(x.shape[0]):
-                        for type in range(x.shape[1]):
-                            x[batch][type][x_ind][y_ind] = 0.0
-        x = torch.sigmoid(x)
-
-        bce_loss = nn.BCELoss()
+        bce_loss = nn.BCEWithLogitsLoss()
         loss1 = bce_loss(x[:, 0, :, :], targets[:, 0, :, :])
-
         mse_loss = nn.MSELoss()
-        loss2 = mse_loss(x[:, 1, :, :], targets[:, 1, :, :]) + \
-                mse_loss(x[:, 2, :, :], targets[:, 2, :, :])
-        loss3 = mse_loss(x[:, 3, :, :], targets[:, 3, :, :]) + \
-                mse_loss(x[:, 4, :, :], targets[:, 4, :, :])
+        # print(targets[:, 0, :, :])
+        mask = targets[:, 0, :, :].bool()
+        # print(mask)
+        # x_new = x.clone()
+        # for x_ind in range(x.shape[2]):
+        #     for y_ind in range(x.shape[3]):
+        #         if targets[0][0][x_ind][y_ind] == 0.0:
+        #             for batch in range(x.shape[0]):
+        #                 for type in range(x.shape[1]):
+        #                     x_new[batch][type][x_ind][y_ind] = 0.0
 
+        loss2 = mse_loss(torch.sigmoid(torch.masked_select(x[:, 1, :, :], mask)),
+                         torch.masked_select(targets[:, 1, :, :], mask)) + \
+                mse_loss(torch.sigmoid(torch.masked_select(x[:, 2, :, :], mask)),
+                         torch.masked_select(targets[:, 2, :, :], mask))
+
+        loss3 = mse_loss(torch.sigmoid(torch.masked_select(x[:, 3, :, :], mask)),
+                         torch.masked_select(targets[:, 3, :, :], mask)) + \
+                mse_loss(torch.sigmoid(torch.masked_select(x[:, 4, :, :], mask)),
+                         torch.masked_select(targets[:, 4, :, :], mask))
         return loss1 + loss2 + loss3
+
+    # def compute_loss(self, x, targets):
+    #
+    #     x = torch.sigmoid(x)
+    #
+    #     bce_loss = nn.BCELoss()
+    #     loss1 = bce_loss(x[:, 0, :, :], targets[:, 0, :, :])
+    #
+    #     mse_loss = nn.MSELoss()
+    #
+    #     for x_ind in range(x.shape[2]):
+    #         for y_ind in range(x.shape[3]):
+    #             if targets[0][0][x_ind][y_ind] == 0.0:
+    #                 for batch in range(x.shape[0]):
+    #                     for type in range(x.shape[1]):
+    #                         x[batch][type][x_ind][y_ind] = 0.0
+    #
+    #     loss2 = mse_loss(x[:, 1, :, :], targets[:, 1, :, :]) + \
+    #             mse_loss(x[:, 2, :, :], targets[:, 2, :, :])
+    #     loss3 = mse_loss(x[:, 3, :, :], targets[:, 3, :, :]) + \
+    #             mse_loss(x[:, 4, :, :], targets[:, 4, :, :])
+    #
+    #     return loss1 + loss2 + loss3
 
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""

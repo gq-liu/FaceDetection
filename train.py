@@ -25,7 +25,7 @@ import torch.optim as optim
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
-    parser.add_argument("--batch_size", type=int, default=8, help="size of each image batch")
+    parser.add_argument("--batch_size", type=int, default=1, help="size of each image batch")
     parser.add_argument("--gradient_accumulations", type=int, default=2, help="number of gradient accums before step")
     parser.add_argument("--model_def", type=str, default="config/facenet.cfg", help="path to model definition file")
     parser.add_argument("--data_config", type=str, default="config/face.data", help="path to data config file")
@@ -98,13 +98,17 @@ if __name__ == "__main__":
     for epoch in range(opt.epochs):
         model.train()
         start_time = time.time()
-        for batch_i, (_, imgs, targets) in enumerate(dataloader):
+        for batch_i, (imgs, targets) in enumerate(dataloader):
             batches_done = len(dataloader) * epoch + batch_i
 
             imgs = Variable(imgs.to(device))
             targets = Variable(targets.to(device), requires_grad=False)
-
+            print(imgs.shape)
+            imgs = imgs.permute(0, 3, 1, 2)
+            print(imgs[0][0][0][0])
+            imgs = imgs.float()
             loss, outputs = model(imgs, targets)
+            print(outputs)
             loss.backward()
 
             if batches_done % opt.gradient_accumulations:

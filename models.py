@@ -248,20 +248,23 @@ class Darknet(nn.Module):
         loss = 0
         layer_outputs, yolo_outputs = [], []
         for i, (module_def, module) in enumerate(zip(self.module_defs, self.module_list)):
-            if module_def["type"] in ["convolutional", "upsample", "maxpool"]:
-                x = module(x)
-            elif module_def["type"] == "route":
-                x = torch.cat([layer_outputs[int(layer_i)] for layer_i in module_def["layers"].split(",")], 1)
-            elif module_def["type"] == "shortcut":
-                layer_i = int(module_def["from"])
-                x = layer_outputs[-1] + layer_outputs[layer_i]
-            elif module_def["type"] == "yolo":
-                x, layer_loss = module[0](x, targets, img_dim)
-                loss += layer_loss
-                yolo_outputs.append(x)
-            layer_outputs.append(x)
-        yolo_outputs = to_cpu(torch.cat(yolo_outputs, 1))
-        return yolo_outputs if targets is None else (loss, yolo_outputs)
+            x = module(x)
+        print(x.shape)
+        return x, loss
+        #     if module_def["type"] in ["convolutional", "upsample", "maxpool"]:
+        #         x = module(x)
+        #     elif module_def["type"] == "route":
+        #         x = torch.cat([layer_outputs[int(layer_i)] for layer_i in module_def["layers"].split(",")], 1)
+        #     elif module_def["type"] == "shortcut":
+        #         layer_i = int(module_def["from"])
+        #         x = layer_outputs[-1] + layer_outputs[layer_i]
+        #     elif module_def["type"] == "yolo":
+        #         x, layer_loss = module[0](x, targets, img_dim)
+        #         loss += layer_loss
+        #         yolo_outputs.append(x)
+        #     layer_outputs.append(x)
+        # yolo_outputs = to_cpu(torch.cat(yolo_outputs, 1))
+        # return yolo_outputs if targets is None else (loss, yolo_outputs)
 
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""

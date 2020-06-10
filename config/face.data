@@ -1,0 +1,4 @@
+train=data/WIDER_train/images
+valid=data/WIDER_val/images
+train_label=data/wider_face_split/wider_face_train_bbx_gt.txt
+valid_label=data/wider_face_split/wider_face_val_bbx_gt.txt

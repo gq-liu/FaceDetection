@@ -145,8 +145,8 @@ class YOLOLayer(nn.Module):
 
         prediction = (
             x.view(num_samples, self.num_anchors, self.num_classes + 5, grid_size, grid_size)
-            .permute(0, 1, 3, 4, 2)
-            .contiguous()
+                .permute(0, 1, 3, 4, 2)
+                .contiguous()
         )
 
         # Get outputs
@@ -249,8 +249,8 @@ class Darknet(nn.Module):
         layer_outputs, yolo_outputs = [], []
         for i, (module_def, module) in enumerate(zip(self.module_defs, self.module_list)):
             x = module(x)
-        print(x.shape)
-        return x, loss
+        loss += self.compute_loss(x, targets)
+        return loss, x
         #     if module_def["type"] in ["convolutional", "upsample", "maxpool"]:
         #         x = module(x)
         #     elif module_def["type"] == "route":
@@ -265,6 +265,26 @@ class Darknet(nn.Module):
         #     layer_outputs.append(x)
         # yolo_outputs = to_cpu(torch.cat(yolo_outputs, 1))
         # return yolo_outputs if targets is None else (loss, yolo_outputs)
+
+    def compute_loss(self, x, targets):
+        for x_ind in range(x.shape[2]):
+            for y_ind in range(x.shape[3]):
+                if targets[0][0][x_ind][y_ind] == 0.0:
+                    for batch in range(x.shape[0]):
+                        for type in range(x.shape[1]):
+                            x[batch][type][x_ind][y_ind] = 0.0
+        x = torch.sigmoid(x)
+
+        bce_loss = nn.BCELoss()
+        loss1 = bce_loss(x[:, 0, :, :], targets[:, 0, :, :])
+
+        mse_loss = nn.MSELoss()
+        loss2 = mse_loss(x[:, 1, :, :], targets[:, 1, :, :]) + \
+                mse_loss(x[:, 2, :, :], targets[:, 2, :, :])
+        loss3 = mse_loss(x[:, 3, :, :], targets[:, 3, :, :]) + \
+                mse_loss(x[:, 4, :, :], targets[:, 4, :, :])
+
+        return loss1 + loss2 + loss3
 
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""
@@ -292,30 +312,30 @@ class Darknet(nn.Module):
                     bn_layer = module[1]
                     num_b = bn_layer.bias.numel()  # Number of biases
                     # Bias
-                    bn_b = torch.from_numpy(weights[ptr : ptr + num_b]).view_as(bn_layer.bias)
+                    bn_b = torch.from_numpy(weights[ptr: ptr + num_b]).view_as(bn_layer.bias)
                     bn_layer.bias.data.copy_(bn_b)
                     ptr += num_b
                     # Weight
-                    bn_w = torch.from_numpy(weights[ptr : ptr + num_b]).view_as(bn_layer.weight)
+                    bn_w = torch.from_numpy(weights[ptr: ptr + num_b]).view_as(bn_layer.weight)
                     bn_layer.weight.data.copy_(bn_w)
                     ptr += num_b
                     # Running Mean
-                    bn_rm = torch.from_numpy(weights[ptr : ptr + num_b]).view_as(bn_layer.running_mean)
+                    bn_rm = torch.from_numpy(weights[ptr: ptr + num_b]).view_as(bn_layer.running_mean)
                     bn_layer.running_mean.data.copy_(bn_rm)
                     ptr += num_b
                     # Running Var
-                    bn_rv = torch.from_numpy(weights[ptr : ptr + num_b]).view_as(bn_layer.running_var)
+                    bn_rv = torch.from_numpy(weights[ptr: ptr + num_b]).view_as(bn_layer.running_var)
                     bn_layer.running_var.data.copy_(bn_rv)
                     ptr += num_b
                 else:
                     # Load conv. bias
                     num_b = conv_layer.bias.numel()
-                    conv_b = torch.from_numpy(weights[ptr : ptr + num_b]).view_as(conv_layer.bias)
+                    conv_b = torch.from_numpy(weights[ptr: ptr + num_b]).view_as(conv_layer.bias)
                     conv_layer.bias.data.copy_(conv_b)
                     ptr += num_b
                 # Load conv. weights
                 num_w = conv_layer.weight.numel()
-                conv_w = torch.from_numpy(weights[ptr : ptr + num_w]).view_as(conv_layer.weight)
+                conv_w = torch.from_numpy(weights[ptr: ptr + num_w]).view_as(conv_layer.weight)
                 conv_layer.weight.data.copy_(conv_w)
                 ptr += num_w
 

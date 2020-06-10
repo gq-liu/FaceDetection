@@ -98,6 +98,27 @@ def write_annotations(annotations, output_path):
                 line = " ".join([str(val) for val in list])
                 file.write(line + "\n")
 
+
+def get_target_matrix(img_labels_list, img_size):
+    num_faces = img_labels_list[0][0]
+    matrix = np.zeros((5, 9, 9))
+    for face_id in range(num_faces):
+        x, y, w, h = img_labels_list[face_id + 1][:4]
+        x_r = float(x) / img_size
+        y_r = float(y) / img_size
+        w_r = float(w) / img_size
+        h_r = float(h) / img_size
+        x_th = int(x_r * 9)
+        y_th = int(y_r * 9)
+        center_x = (x - (float(img_size) / 9) * x_th) / (float(img_size) / 9)
+        center_y = (y - (float(img_size) / 9) * y_th) / (float(img_size) / 9)
+        matrix[0][x_th][y_th] = 1
+        matrix[1][x_th][y_th] = center_x
+        matrix[2][x_th][y_th] = center_y
+        matrix[3][x_th][y_th] = w_r
+        matrix[4][x_th][y_th] = h_r
+    return matrix
+
 class ImageFolder(Dataset):
     def __init__(self, folder_path, img_size=416):
         self.files = sorted(glob.glob("%s/*.*" % folder_path))
@@ -129,6 +150,7 @@ class ListDataset(Dataset):
         self.img_labels_dict = read_annotations("data/wider_face_split/wider_face_train_bbx_gt_resized.txt")
         self.img_files = []
         self.label_files = []
+        self.target_matrix = []
         dirs = os.listdir(self.data_path)
         for dir in dirs:
             if dir == ".DS_Store": continue
@@ -141,6 +163,7 @@ class ListDataset(Dataset):
                 # image_resized = resize(image, img_size)
                 self.img_files.append(image)
                 self.label_files.append(self.img_labels_dict[filename])
+                self.target_matrix.append(get_target_matrix(self.img_labels_dict[filename], img_size))
         # with open(list_path, "r") as file:
         #     self.img_files = file.readlines()
 
@@ -160,7 +183,7 @@ class ListDataset(Dataset):
     def __getitem__(self, index):
 
         img = self.img_files[index]
-        label = self.label_files[index]
+        label = self.target_matrix[index]
         return img, label
 
         # ---------

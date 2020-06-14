@@ -7,7 +7,6 @@ from PIL import Image
 import cv2
 import torch
 import torch.nn.functional as F
-
 from utils.augmentations import horisontal_flip
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
@@ -44,7 +43,7 @@ def resize_images(image_path, output_path, annotation_dict):
             for file in files:
                 filename = dir + "/" + file
                 file_path = image_path + "/" + filename
-                print(file_path)
+                #                 print(file_path)
                 image_before = cv2.imread(file_path)
                 image_after = cv2.resize(image_before, (288, 288), interpolation=cv2.INTER_CUBIC)
                 y_resize_rate = float(image_after.shape[0]) / image_before.shape[0]
@@ -99,7 +98,7 @@ def write_annotations(annotations, output_path):
                 file.write(line + "\n")
 
 
-def get_target_matrix(img_labels_list, img_size):
+def get_target_matrix(img_labels_list, img_size, mirror):
     num_faces = img_labels_list[0][0]
     matrix = np.zeros((5, 9, 9))
     for face_id in range(num_faces):
@@ -114,12 +113,19 @@ def get_target_matrix(img_labels_list, img_size):
         if x_th == 9: x_th -= 1
         center_x = (x - (float(img_size) / 9) * x_th) / (float(img_size) / 9)
         center_y = (y - (float(img_size) / 9) * y_th) / (float(img_size) / 9)
-        matrix[0][x_th][y_th] = 1
-        matrix[1][x_th][y_th] = center_x
-        matrix[2][x_th][y_th] = center_y
-        matrix[3][x_th][y_th] = w_r
-        matrix[4][x_th][y_th] = h_r
-    return matrix
+        matrix[0][y_th][x_th] = 1
+        matrix[1][y_th][x_th] = center_x
+        matrix[2][y_th][x_th] = center_y
+        matrix[3][y_th][x_th] = w_r
+        matrix[4][y_th][x_th] = h_r
+    matrix_mirror = np.zeros((5, 9, 9))
+    matrix_mirror[0] = np.fliplr(matrix[0])
+    matrix_mirror[1] = np.fliplr(matrix[1])
+    matrix_mirror[2] = np.fliplr(matrix[2])
+    matrix_mirror[3] = np.fliplr(matrix[3])
+    matrix_mirror[4] = np.fliplr(matrix[4])
+    return matrix_mirror if mirror else matrix
+
 
 class ImageFolder(Dataset):
     def __init__(self, folder_path, img_size=416):
@@ -142,30 +148,44 @@ class ImageFolder(Dataset):
 
 
 class ListDataset(Dataset):
-    def __init__(self, list_path, resized_data_path, label_path, resized_label_path, img_size=288, augment=True, multiscale=True, normalized_labels=True):
+    def __init__(self, list_path, resized_data_path, label_path, resized_label_path, img_size=288, augment=True,
+                 multiscale=True, normalized_labels=True):
         # self.data_path = "data/WIDER_train/resized_images"
-        if not os.path.exists(resized_data_path):
-            self.img_labels_dict = read_annotations(label_path)
-            resize_images(list_path, resized_data_path, self.img_labels_dict)
-            write_annotations(self.img_labels_dict, resized_label_path)
+        #         if not os.path.exists(resized_data_path):
+        #             self.img_labels_dict = read_annotations(label_path)
+        #             resize_images(list_path, resized_data_path, self.img_labels_dict)
+        #             write_annotations(self.img_labels_dict, resized_label_path)
 
         self.img_labels_dict = read_annotations(resized_label_path)
         self.img_files = []
         self.label_files = []
         self.target_matrix = []
         dirs = os.listdir(resized_data_path)
+        count = 0
         for dir in dirs:
             if dir == ".DS_Store": continue
+            count += 1
+            if count == 30: break
             files = os.listdir(resized_data_path + "/" + dir)
             for file in files:
+                if file == ".ipynb_checkpoints": continue
                 filename = dir + "/" + file
-                # print(filename)
+                #                 print(filename)
                 file_path = resized_data_path + "/" + filename
-                image = cv2.imread(file_path).astype(dtype=np.float)
+                image = cv2.imread(file_path)
+                #                 image_im = Image.fromarray(image)
+                image = image.astype(dtype=np.float)
                 # image_resized = resize(image, img_size)
                 self.img_files.append(image)
                 self.label_files.append(self.img_labels_dict[filename])
-                self.target_matrix.append(get_target_matrix(self.img_labels_dict[filename], img_size))
+                self.target_matrix.append(get_target_matrix(self.img_labels_dict[filename], img_size, mirror=False))
+        #                 print(self.target_matrix[-1])
+
+        #                 im_h = transforms.functional.hflip(image_im)
+        #                 image_h = np.array(im_h).astype(dtype=np.float)
+        #                 self.img_files.append(image_h)
+        #                 self.target_matrix.append(get_target_matrix(self.img_labels_dict[filename], img_size, mirror=True))
+
         # with open(list_path, "r") as file:
         #     self.img_files = file.readlines()
 
@@ -173,6 +193,7 @@ class ListDataset(Dataset):
         #     path.replace("images", "labels").replace(".png", ".txt").replace(".jpg", ".txt")
         #     for path in self.img_files
         # ]
+        print("finished")
         self.img_size = img_size
         self.max_objects = 100
         self.augment = augment

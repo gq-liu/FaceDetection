@@ -268,7 +268,12 @@ class Darknet(nn.Module):
         # return yolo_outputs if targets is None else (loss, yolo_outputs)
 
     def compute_loss(self, x, targets):
-        bce_loss = nn.BCEWithLogitsLoss()
+        num_pos = torch.sum(targets[:, 0, :, :])
+        ratio = float(targets.shape[0]*9*9 - num_pos) / num_pos
+        add = ratio / (ratio - 1)
+        pos_weight = targets[:, 0, :, :].clone()
+        pos_weight = pos_weight * ratio + add
+        bce_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss1 = bce_loss(x[:, 0, :, :], targets[:, 0, :, :])
         mse_loss = nn.MSELoss()
         # print(targets[:, 0, :, :])

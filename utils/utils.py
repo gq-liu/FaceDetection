@@ -319,3 +319,25 @@ def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
 
     tconf = obj_mask.float()
     return iou_scores, class_mask, obj_mask, noobj_mask, tx, ty, tw, th, tcls, tconf
+
+def resize_images(image, image_size):
+
+    if os.path.exists(output_path):
+        return
+    else:
+        os.mkdir(output_path)
+        dirs = os.listdir(image_path)
+        for dir in dirs:
+            if dir == ".DS_Store": continue
+            os.mkdir(output_path + "/" + dir)
+            files = os.listdir(image_path + "/" + dir)
+            for file in files:
+                filename = dir + "/" + file
+                file_path = image_path + "/" + filename
+                print(file_path)
+                image_before = cv2.imread(file_path)
+                image_after = cv2.resize(image_before, (288, 288), interpolation=cv2.INTER_CUBIC)
+                y_resize_rate = float(image_after.shape[0]) / image_before.shape[0]
+                x_resize_rate = float(image_after.shape[1]) / image_before.shape[1]
+                resize_annotations(filename, y_resize_rate, x_resize_rate, annotation_dict)
+                cv2.imwrite(output_path + "/" + filename, image_after)
